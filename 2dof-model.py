@@ -2,46 +2,47 @@ import grama as gr
 import pandas as pd
 import numpy as np
 from scipy.integrate import solve_ivp
+import matplotlib
+matplotlib.use('TkAgg') # Or 'QtAgg' if you installed PyQt
+import matplotlib.pyplot as plt
 
-def state_transition (init_cond: tuple[float,float,float,float,float,float], input_vec: pd.Series, t_span):
+def state_transition(init_cond: tuple[float,float,float,float,float,float], input_vec: pd.Series, t_span):
 
 
-    for step in t_span:
+     # grab constant control inputs
+    m_b = input_vec[0]
+    r_p = input_vec[1]
 
-        # numerically integrate to solve next state
-        state = solve_ivp(
+
+    control_inputs = (m_b, r_p)
+
+    
+    state = solve_ivp(
         slocum_eoms, 
         [t_span[0], t_span[-1]], 
         init_cond, 
         method='RK45', 
+        args=control_inputs,
         dense_output=True,
-    )
+        )
      
-    return gr.df_make(
-        
-    )
+    return state
 
-def slocum_eoms(t_span, states):
+def slocum_eoms(t_span, states, m_b, r_p):
 
     # grab previous states
-    x,z,theta,x_dot,z_dot,theta_dot = states[-1]
-
-    # grab constant control inputs
-    m_b = input_vec[0]
-    r_p = input_vec[1]
+    x,z,theta,x_dot,z_dot,theta_dot = states
 
     # aerodynamic constants
-    rho = 
-    A =
-    g =
+    rho = 1000 #kg/m**3
+    A = 0.0355 #m**2
+    g = 9.81 #m/s**2
 
     # vehicle constants
-    m = 
-    m_hull =
-    m_bar =  
+    m_hull = 50
+    m_bar = 9.1
+    m = m_hull + m_bar
     r_b = 0
-    m_f1 =
-    m_f3 =
 
     # calculate mass of vehicle and net buoyancy
     m_v = m_hull + m_b + m_bar
@@ -82,17 +83,34 @@ def slocum_eoms(t_span, states):
 
     return [x_dot,z_dot,theta_dot,x_ddot,z_ddot,theta_ddot]
     
+v_b = 2.5e-4
+m_b = v_b * 1000
+r_p = 0.25
 
-md_det_abs = (
-        gr.Model()
-        >> gr.cp_vec_function(
-            fun=model_trajectory,
-            var=["m_b", "r_p"],
-            out=["glide_angle"],
-        )
-        >> gr.cp_bounds(
-            #wide ranges selected to allow for system exploration
-            m_b =(1e2, 1e4),
-            r_p = (1e1, 1e2),
-        )
-    )
+control_vec = pd.Series([m_b, r_p])
+
+x = 0
+z = 0
+theta = -np.pi/2
+x_dot = 1
+z_dot = 1
+theta_dot = 0
+
+ics = (x,z,theta,x_dot,z_dot,theta_dot)
+
+t_span = [0,1000]
+
+glide_path = state_transition(ics,control_vec, t_span)
+
+# print(glide_path.t)
+print(glide_path.y)
+# print(np.shape(glide_path.y))
+
+t_res = glide_path.t
+state_res = glide_path.y
+
+plt.scatter(state_res[0,:],state_res[1,:],t_res)
+plt.xlabel("X Position")
+plt.ylabel("Z Position")
+plt.title("Steady Control Input Glide Path")
+plt.show()
